@@ -42,16 +42,17 @@ class SubscriptionDialogState;
 // TYPEDEFS
 
 template <class T>
-class Wrap
+class UtlLocker
 {
 public:
-    Wrap(T obj);
-    Wrap();
-    virtual ~Wrap();
+    UtlLocker(T obj);
+    UtlLocker();
+    virtual ~UtlLocker();
 
-   //! Copying operators.
-   Wrap(const Wrap& rWrap);
-   //Wrap& operator=(const Wrap& rhs);
+    T& operator* () const // never throws
+    {
+        return *_obj;
+    }
 
    T operator-> () const // never throws
    {
@@ -72,6 +73,11 @@ public:
    {
        return _obj;
    }
+
+private:
+   //! Copying operators.
+   UtlLocker(const UtlLocker& rUtlLocker);
+   UtlLocker& operator=(const UtlLocker& rhs);
 
 private:
    T _obj;
@@ -173,6 +179,8 @@ public:
     {
     public:
         typedef boost::shared_ptr<SubscriptionGroupState> Ptr;
+        typedef UtlLocker<SubscriptionGroupState::Ptr> WrapPtr;
+        typedef boost::shared_ptr<SubscriptionGroupState::WrapPtr> AutoWrapPtr;
 
        // The parent UtlString contains the original earlyDialogHandle as a key.
        // This key never changes, and is the earlyDialogHandle returned by
@@ -282,7 +290,7 @@ public:
        OsTimer mRestartTimer;
 
     private:
-       mutable boost::shared_mutex _accessMutex;
+       mutable boost::recursive_mutex _accessMutex;
     };
 
 public:
@@ -292,6 +300,8 @@ public:
     {
     public:
         typedef boost::shared_ptr<SubscriptionDialogState> Ptr;
+        typedef UtlLocker<SubscriptionDialogState::Ptr> WrapPtr;
+        typedef boost::shared_ptr<SubscriptionDialogState::WrapPtr> AutoWrapPtr;
 
        // The parent UtlString contains the dialogHandle as a key
        // When an initial SUBSCRIBE is sent, a SubscriptionDialogState is
@@ -336,7 +346,7 @@ public:
        // compare as members of the base class (UtlString).
 
     private:
-       mutable boost::shared_mutex _accessMutex;
+       mutable boost::recursive_mutex _accessMutex;
     };
 
 public:
@@ -473,7 +483,7 @@ public:
     //! Dump the object's internal state.
     void dumpState();
 
-    void dumpSubscriptionDialog(const char *message, SipSubscribeClient::SubscriptionDialogState::Ptr &dialogState);
+    void dumpSubscriptionDialog(const char *message, SubscriptionDialogState::Ptr &dialogState);
     void dumpSubscriptionDialogs(const char *message, bool lock);
 
 /* //////////////////////////// PROTECTED ///////////////////////////////// */
@@ -520,22 +530,24 @@ private:
      */
     void addDialogState(SubscriptionDialogState::Ptr &dialogState);
 
+    SubscriptionGroupState::AutoWrapPtr getFirstGroupState();
+
     //! find the state from mSubscriptionGroups with the specified current handle
     /*  Assumes external locking
      */
-    Wrap<SubscriptionGroupState::Ptr> getGroupStateByOriginalHandle(const UtlString& dialogHandle);
+    SubscriptionGroupState::AutoWrapPtr getGroupStateByOriginalHandle(const UtlString& dialogHandle);
 
     //! find the state from mSubscriptionGroups with the specified original handle
     /*  Assumes external locking
      */
-    Wrap<SubscriptionGroupState::Ptr> getGroupStateByCurrentHandle(const UtlString& dialogHandle);
+    SubscriptionGroupState::AutoWrapPtr getGroupStateByCurrentHandle(const UtlString& dialogHandle);
 
     //! find the state from mSubscriptionDialogs that matches the handle
     /*  Assumes external locking
      */
-    Wrap<SubscriptionDialogState::Ptr> getDialogState(const UtlString& dialogHandle);
+    SubscriptionDialogState::AutoWrapPtr getDialogState(const UtlString& dialogHandle);
 
-    Wrap<SubscriptionDialogState::Ptr> getDialogStateByGroupState(const SubscriptionGroupState::Ptr& groupState);
+    SubscriptionDialogState::AutoWrapPtr getDialogStateByGroupState(const SubscriptionGroupState::Ptr& groupState);
 
     /** Recalculate the current early dialog handle from the SUBSCRIBE request
      *  and revise mSubscriptionGroupsByCurrentHandle.
@@ -546,17 +558,17 @@ private:
     //! remove the state from mSubscriptionGroups with the specified original handle
     /*  Assumes external locking.
      */
-    Wrap<SubscriptionGroupState::Ptr> removeGroupStateByOriginalHandle(const UtlString& dialogHandle);
+    SubscriptionGroupState::AutoWrapPtr removeGroupStateByOriginalHandle(const UtlString& dialogHandle);
 
     //! remove the state from mSubscriptionGroups with the specified current handle
     /*  Assumes external locking.
      */
-    Wrap<SubscriptionGroupState::Ptr> removeGroupStateByCurrentHandle(const UtlString& dialogHandle);
+    SubscriptionGroupState::AutoWrapPtr removeGroupStateByCurrentHandle(const UtlString& dialogHandle);
 
     //! remove the state from mSubscriptionDialogs that matches the dialog
     /*  Assumes external locking.
      */
-    Wrap<SubscriptionDialogState::Ptr> removeDialogState(const UtlString& dialogHandle);
+    SubscriptionDialogState::AutoWrapPtr removeDialogState(const UtlString& dialogHandle);
 
     /// Reestablish a subscription.
     /*  This method  is used both to "reestablish" a subscription that has failed
