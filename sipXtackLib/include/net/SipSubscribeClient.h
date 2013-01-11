@@ -536,6 +536,8 @@ private:
     /*  Assumes external locking
      */
     SubscriptionGroupState::AutoWrapPtr getGroupStateByOriginalHandle(const UtlString& dialogHandle);
+    SubscriptionGroupState::Ptr getGroupStateFromAWP(const SubscriptionGroupState::AutoWrapPtr &awp);
+    SubscriptionDialogState::Ptr getDialogStateFromAWP(const SubscriptionDialogState::AutoWrapPtr &awp);
 
     //! find the state from mSubscriptionGroups with the specified original handle
     /*  Assumes external locking
