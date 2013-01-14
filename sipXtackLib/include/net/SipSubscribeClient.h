@@ -41,46 +41,49 @@ class SubscriptionDialogState;
 
 // TYPEDEFS
 
+//! Class to prevent access to a object from multiple threads
+/** This class is a locking wrapper over an object. The wrap constructor
+ * it will lock the received object by calling the lock method of the
+ * object. The object will be unlocked in the wrap destructor. This
+ * wrapper class inherits from boost:noncopyable so it cannot be copied,
+ * thus preventing usage of the object lock outside the constructor and
+ * destructor (this is a guarantee that the lock/unlock will be done only
+ * one time per wrap).
+ */
 template <class T>
-class UtlLocker
+class UtlLocker: public boost::noncopyable
 {
 public:
-    UtlLocker(T obj);
-    UtlLocker();
-    virtual ~UtlLocker();
-
-    T& operator* () const // never throws
+    UtlLocker()
     {
-        return *_obj;
+        _obj = T();
     }
 
-   T operator-> () const // never throws
-   {
-       return _obj;
-   }
+    UtlLocker(T obj)
+    {
+        _obj = obj;
 
-   operator bool () const
-   {
-       return _obj != 0;
-   }
+        if (_obj)
+        {
+            _obj->lock();
+        }
+    }
 
-   bool operator! () const // never throws
-   {
-       return !(_obj);
-   }
+    virtual ~UtlLocker()
+    {
+        if (_obj)
+        {
+            _obj->unlock();
+        }
+    }
 
-   T get() const // never throws
-   {
-       return _obj;
-   }
-
-private:
-   //! Copying operators.
-   UtlLocker(const UtlLocker& rUtlLocker);
-   UtlLocker& operator=(const UtlLocker& rhs);
+    T get() const
+    {
+        return _obj;
+    }
 
 private:
-   T _obj;
+    T _obj;
 };
 
 //! Class for maintaining the subscriber role of SIP subscriptions
@@ -246,8 +249,10 @@ public:
        //  Call-Id and from-tag.
        void resetStarting();
 
+       /// Lock the object to prevent access from multiple threads.
        void lock();
 
+       /// Unlock a previously locked object.
        void unlock();
 
        // This class does not define ::getContainableType or ::TYPE so that objects
@@ -290,6 +295,8 @@ public:
        OsTimer mRestartTimer;
 
     private:
+       /// Mutex needed to protect access to the class.
+       // It is recursive because it can be locked multiple times from the same thread.
        mutable boost::recursive_mutex _accessMutex;
     };
 
@@ -301,7 +308,7 @@ public:
     public:
         typedef boost::shared_ptr<SubscriptionDialogState> Ptr;
         typedef UtlLocker<SubscriptionDialogState::Ptr> WrapPtr;
-        typedef boost::shared_ptr<SubscriptionDialogState::WrapPtr> AutoWrapPtr;
+        typedef std::auto_ptr<SubscriptionDialogState::WrapPtr> AutoWrapPtr;
 
        // The parent UtlString contains the dialogHandle as a key
        // When an initial SUBSCRIBE is sent, a SubscriptionDialogState is
@@ -327,8 +334,10 @@ public:
        SubscriptionDialogState(const SubscriptionDialogState& rSubscriptionDialogState);
        SubscriptionDialogState& operator=(const SubscriptionDialogState& rhs);
 
+       /// Lock the object to prevent access from multiple threads.
        void lock();
 
+       /// Unlock a previously locked object.
        void unlock();
 
        // The SubscriptionGroupState object for the ::addSubscription() that
@@ -346,6 +355,8 @@ public:
        // compare as members of the base class (UtlString).
 
     private:
+       /// Mutex needed to protect access to the class.
+       // It is recursive because it can be locked multiple times from the same thread.
        mutable boost::recursive_mutex _accessMutex;
     };
 
