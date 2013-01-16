@@ -176,7 +176,7 @@ private:
       bool operator() (const OsTimerData& a, const OsTimerData& b) const
       {
           // timers are compared by the expiration date.
-          return (a._at < b._at);
+          return (a._at > b._at);
       }
    };
 

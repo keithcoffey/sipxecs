@@ -95,12 +95,14 @@ class OsTimerQueueTest : public CppUnit::TestCase
     };
 
 
+
     CPPUNIT_TEST_SUITE(OsTimerQueueTest);
 
     //All unit tests are listed here.
     CPPUNIT_TEST(testRegularConstructorWithInvalidParam);
     CPPUNIT_TEST(testScheduleOneTimer);
     CPPUNIT_TEST(testScheduleManyTimers);
+    CPPUNIT_TEST(testTimersOrderedExpirationOK);
     CPPUNIT_TEST(testStopRemovesNonExpiredTimers);
     CPPUNIT_TEST(testDestructorNoRemainingTimers);
 
@@ -243,6 +245,68 @@ public:
         doTestScheduleOneTimer(msec1000, str1000);
     }
 
+    // Helper to plain schedule of a timer
+    void doScheduleTimer(OsTimerQueue& tq, OsTime& offset, const char* cstr)
+    {
+        int  tqSize = tq._timers.size();
+
+        UtlString str(cstr);
+        OsMsgTest *msgTest = new OsMsgTest(str);
+        CPPUNIT_ASSERT(OS_SUCCESS == tq.scheduleOneshotAfter(msgTest, offset));
+        CPPUNIT_ASSERT((tqSize+1) == tq._timers.size());
+    }
+
+
+    // Check expected behavior of schedule() method for more timers
+    void testTimersOrderedExpirationOK()
+    {
+        OsTime startTime;
+
+        OsTime at1;
+        OsTime at2;
+        OsTime at3;
+        OsTime at4;
+        OsTime at5;
+
+        OsTimerQueue tq(&_msgSignalQueue);
+        checkAfterRegularConstructor(tq, &_msgSignalQueue);
+
+        OsDateTime::getCurTime(startTime);
+
+        // TEST: Add several timers and expect them to be added ordered
+        doScheduleTimer(tq, msec1000, "Schedule msec1000");
+        doScheduleTimer(tq, msec100, "Schedule msec100");
+        doScheduleTimer(tq, msec300, "Schedule msec300");
+        doScheduleTimer(tq, msec200, "Schedule msec200");
+        doScheduleTimer(tq, msec1000, "Schedule msec1000");
+
+        // extract expiration date from the timers and remove all timers
+        at1 = tq._timers.top()._at;
+        tq._timers.top()._timer->stop(TRUE); tq._timers.pop();
+        at2 = tq._timers.top()._at;
+        tq._timers.top()._timer->stop(TRUE); tq._timers.pop();
+        at3 = tq._timers.top()._at;
+        tq._timers.top()._timer->stop(TRUE); tq._timers.pop();
+        at4 = tq._timers.top()._at;
+        tq._timers.top()._timer->stop(TRUE); tq._timers.pop();
+        at5 = tq._timers.top()._at;
+        tq._timers.top()._timer->stop(TRUE); tq._timers.pop();
+        CPPUNIT_ASSERT(0 == tq._timers.size() > 0);
+
+        // TEST:  Timers should be in the proper order
+        CPPUNIT_ASSERT(at1 <= at2);
+        CPPUNIT_ASSERT(at2 <= at3);
+        CPPUNIT_ASSERT(at3 <= at4);
+        CPPUNIT_ASSERT(at4 <= at5);
+
+        // TEST: Timers expiration dates should be proper calculated as (now + offset)
+        CPPUNIT_ASSERT((msec100 + startTime) <= at1);
+        CPPUNIT_ASSERT((msec200 + startTime) <= at2);
+        CPPUNIT_ASSERT((msec300 + startTime) <= at3);
+        CPPUNIT_ASSERT((msec1000 + startTime) <= at4);
+        CPPUNIT_ASSERT((msec1000 + startTime) <= at5);
+    }
+
     // Check expected behavior of schedule() method for more timers
     void testScheduleManyTimers()
     {
@@ -263,33 +327,34 @@ public:
         CPPUNIT_ASSERT(2 == tq._timers.size());
 
         // TEST: Adding third timer should work
-        UtlString str300("Schedule msec300");
-        OsMsgTest *msgTest300 = new OsMsgTest(str300);
-        CPPUNIT_ASSERT(OS_SUCCESS == tq.scheduleOneshotAfter(msgTest300, msec300));
+        UtlString str1000("Schedule msec1000");
+        OsMsgTest *msgTest1000 = new OsMsgTest(str1000);
+        CPPUNIT_ASSERT(OS_SUCCESS == tq.scheduleOneshotAfter(msgTest1000, msec1000));
+
+        // TEST: 3 timers added so the queue size should be 3
         // TEST: This proves that schedule does not remove unexpired timers
         // TEST: cleanUntil works for (interval != INFINITY)
         CPPUNIT_ASSERT(3 == tq._timers.size());
 
-        //give them some time to fire;
-        OsTask::delay(msec300.cvtToMsecs());
+        //give them some time so that 100ms and 200ms timers fire;
+        OsTask::delay(msec200.cvtToMsecs());
 
-        // TEST: Check that all timers fired
+        // TEST: Check that the 100ms and 200ms timers fired
         checkTimerFired(_msgSignalQueue, msec100, str100, OS_SUCCESS);
-        checkTimerFired(_msgSignalQueue, msec200, str200, OS_SUCCESS);
-        checkTimerFired(_msgSignalQueue, msec300, str300, OS_SUCCESS);
+        checkTimerFired(_msgSignalQueue, msec100, str200, OS_SUCCESS);
 
-        // TEST: Check that schedule removes expired timers by adding another
-        // timer, upon addition schedule should remove the expired timers above
+        // TEST: Upon addition schedule should remove the expired timers above
         UtlString str50("Schedule msec50");
         OsMsgTest *msgTest50 = new OsMsgTest(str50);
         CPPUNIT_ASSERT(OS_SUCCESS == tq.scheduleOneshotAfter(msgTest50, msec50));
-        // only this timer exists in the queue now
-        CPPUNIT_ASSERT(1 == tq._timers.size());
+        // TEST: 3 initial timers, 2 fired, 1 newly added timers so 2 timers should be in the queue
+        CPPUNIT_ASSERT(2 == tq._timers.size());
 
-        //give it some time to fire;
+        //give it some time for the remaining timers to fire;
         OsTask::delay(msec100.cvtToMsecs());
-        // TEST: Last timer added after removel of expired timers fired
+        // TEST: Last two timers fired
         checkTimerFired(_msgSignalQueue, msec50, str50, OS_SUCCESS);
+        checkTimerFired(_msgSignalQueue, msec1000, str1000, OS_SUCCESS);
 
         tq.stop();
         // TEST: This proves that stop removes expired timers
