@@ -25,11 +25,12 @@
 // EXTERNAL VARIABLES
 // CONSTANTS
 
-// Number of milliseconds to wait after terminating subscriptions to a
-// contact before initiating a subscription that might reach the same
-// UA. This is set to 50 ms and is similar with the one from RLS.
-// A higher value will cause SAA to deadlock.
-#define SUBSCRIPTION_WAIT 50
+// After terminating subscriptions to a contact this is the minimum number of
+// msecs to wait  before initiating a subscription that might reach the same UA.
+// This is set to 50 ms and is similar with the one from RLS.
+#define SUBSCRIPTION_WAIT_MSEC 50
+// Increment in msecs of the wait in case subsequent subscriptions are initiated.
+#define SUBSCRIPTION_WAIT_INCR_MSEC 2
 
 // STATIC VARIABLE INITIALIZATIONS
 
@@ -865,7 +866,7 @@ void AppearanceGroup::updateSubscriptions()
    // subscription will be lost.
    // This variable tracks whether such a wait is needed before a
    // subscription is started.
-   bool subscription_ended_but_no_wait_done_yet = false;
+   bool wait_after_subscription_ended = false;
 
    // Iterate through the list of Appearances and remove any that aren't
    // in callid_contacts.
@@ -892,7 +893,7 @@ void AppearanceGroup::updateSubscriptions()
                delete lPartialContent;
             }
             mAppearances.destroy(ss);
-            subscription_ended_but_no_wait_done_yet = true;
+            wait_after_subscription_ended = true;
          }
          else
          {
@@ -910,41 +911,26 @@ void AppearanceGroup::updateSubscriptions()
    {
       UtlHashBagIterator itor(callid_contacts);
       UtlString* callid_contact;
+      long subscription_wait_msec = SUBSCRIPTION_WAIT_MSEC;
       while ((callid_contact = dynamic_cast <UtlString*> (itor())))
       {
-         if (!mAppearances.find(callid_contact))
-         {
             // If we both terminate subscriptions and create subscriptions,
             // wait a short while to allow the terminations to complete.
-            if (SUBSCRIPTION_WAIT > 0)
+            if (wait_after_subscription_ended)
             {
-               if (subscription_ended_but_no_wait_done_yet)
-               {
-                  Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                                "AppearanceGroup::updateSubscriptions waiting for %d msec",
-                                SUBSCRIPTION_WAIT);
-                  OsTask::delay(SUBSCRIPTION_WAIT);
-                  subscription_ended_but_no_wait_done_yet = false;
-               }
-            }
+              Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+                            "AppearanceGroup::updateSubscriptions waiting for %d msec",
+                            subscription_wait_msec);
 
-            Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                          "AppearanceGroup::updateSubscriptions adding subscription for '%s' in mUri = '%s'",
-                          callid_contact->data(), mSharedUser.data());
-            // Get the contact URI into a UtlString.
-            UtlString uri(callid_contact->data() +
-                          callid_contact->index(';') +
-                          1);
-            mAppearances.insertKeyAndValue(new UtlString(*callid_contact),
-                                           new Appearance(getAppearanceAgent(), this,  uri)
-                                           );
-         }
-         else
-         {
-            Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                          "AppearanceGroup::updateSubscriptions using existing subscription for '%s' in mUri = '%s'",
-                          callid_contact->data(), mSharedUser.data());
-         }
+              OsTime offset(subscription_wait_msec);
+              mAppearanceGroupSet->addAppearanceByTimer(*callid_contact, this, offset);
+
+              subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
+            }
+            else
+            {
+               addAppearance(callid_contact);
+            }
       }
    }
 
@@ -1008,6 +994,41 @@ UtlContainableType AppearanceGroup::getContainableType() const
 {
    return AppearanceGroup::TYPE;
 }
+
+void AppearanceGroup::addAppearance(const UtlString* callidContact)
+{
+    Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+            "AppearanceGroupSet::addAppearance this = %p, mUri = '%s' callidContact = '%s'",
+             this, mSharedUser.data(), callidContact->data());
+
+     // Get the contact URI into a UtlString.
+     UtlString uri(callidContact->data() +
+                   callidContact->index(';') +
+                   1);
+
+     // Check to see if there is already a group with this name.
+     if (!mAppearances.find(callidContact))
+     {
+        // Create the appearance
+        Appearance* appearance = new Appearance(getAppearanceAgent(), this,  uri);
+
+        // Add the appearance group to the set.
+        mAppearances.insertKeyAndValue(new UtlString(*callidContact),
+                                       appearance
+                                       );
+
+        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+                "AppearanceGroup::addAppearance "
+                "added Appearance uri = '%s'",
+                uri.data() );
+     }
+     else
+     {
+        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+                      "AppearanceGroup::addAppearance Appearance '%s' already exists", uri.data());
+     }
+}
+
 
 /* //////////////////////////// PROTECTED ///////////////////////////////// */
 
