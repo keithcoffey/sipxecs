@@ -87,7 +87,7 @@ class AppearanceGroupSet : public UtlContainableAtomic
    //! Create and add an Appearance Timer
    //  May be called externally.
 
-   void addAppearanceByTimer(
+   bool addAppearanceByTimer(
            const UtlString& callidContact, /// callidContact used to create a new Appearance
            UtlContainable* handler, /// handler that knows how to create a new Appearance
            const OsTime& offset /// the timer expiration starting from now

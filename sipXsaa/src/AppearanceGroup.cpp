@@ -904,35 +904,45 @@ void AppearanceGroup::updateSubscriptions()
       }
    }
 
-   // Iterate through callid_contacts and add an Appearance for
-   // any that aren't in mAppearances.
-   // We don't limit the number of additions here, as the size of
-   // callid_contacts is guarded by the tests in notifyEventCallback.
-   {
-      UtlHashBagIterator itor(callid_contacts);
-      UtlString* callid_contact;
-      long subscription_wait_msec = SUBSCRIPTION_WAIT_MSEC;
-      while ((callid_contact = dynamic_cast <UtlString*> (itor())))
-      {
+    // Iterate through callid_contacts and add an Appearance for
+    // any that aren't in mAppearances.
+    // We don't limit the number of additions here, as the size of
+    // callid_contacts is guarded by the tests in notifyEventCallback.
+    {
+        UtlHashBagIterator itor(callid_contacts);
+        UtlString* callid_contact;
+        long subscription_wait_msec = SUBSCRIPTION_WAIT_MSEC;
+        int appearancesCount = 0;
+        while ((callid_contact = dynamic_cast <UtlString*> (itor())))
+        {
             // If we both terminate subscriptions and create subscriptions,
             // wait a short while to allow the terminations to complete.
             if (wait_after_subscription_ended)
             {
-              Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+                Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
                             "AppearanceGroup::updateSubscriptions waiting for %d msec",
                             subscription_wait_msec);
 
-              OsTime offset(subscription_wait_msec);
-              mAppearanceGroupSet->addAppearanceByTimer(*callid_contact, this, offset);
-
-              subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
+                OsTime offset(subscription_wait_msec);
+                bool ret = mAppearanceGroupSet->addAppearanceByTimer(*callid_contact, this, offset);
+                if (ret)
+                {
+                    appearancesCount++;
+                    subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
+                }
             }
             else
             {
-               addAppearance(callid_contact);
+                appearancesCount++;
+                addAppearance(callid_contact);
             }
-      }
-   }
+        }
+
+        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+                    "AppearanceGroup::updateSubscriptions added '%d' new appearances",
+                    appearancesCount);
+
+    }
 
    // Free callid_contacts.
    callid_contacts.destroyAll();
@@ -998,7 +1008,7 @@ UtlContainableType AppearanceGroup::getContainableType() const
 void AppearanceGroup::addAppearance(const UtlString* callidContact)
 {
     Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-            "AppearanceGroupSet::addAppearance this = %p, mUri = '%s' callidContact = '%s'",
+            "AppearanceGroupSet::addAppearance this = %p, mSharedUser = '%s' callid;contact = '%s'",
              this, mSharedUser.data(), callidContact->data());
 
      // Get the contact URI into a UtlString.
@@ -1019,13 +1029,13 @@ void AppearanceGroup::addAppearance(const UtlString* callidContact)
 
         Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
                 "AppearanceGroup::addAppearance "
-                "added Appearance uri = '%s'",
+                "added Appearance for uri = '%s'",
                 uri.data() );
      }
      else
      {
         Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                      "AppearanceGroup::addAppearance Appearance '%s' already exists", uri.data());
+                      "AppearanceGroup::addAppearance Appearance for uri '%s' already exists", uri.data());
      }
 }
 

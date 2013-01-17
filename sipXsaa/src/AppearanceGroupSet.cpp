@@ -55,19 +55,28 @@ AppearanceGroupSet::~AppearanceGroupSet()
 
 /* ============================ MANIPULATORS ============================== */
 
-void AppearanceGroupSet::addAppearanceByTimer(
+bool AppearanceGroupSet::addAppearanceByTimer(
         const UtlString& callidContact,
         UtlContainable* handler,
         const OsTime& offset)
 {
     Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-            "AppearanceGroupSet::addAppearancebyTimer "
+            "AppearanceGroupSet::addAppearanceByTimer "
             "this = %p, callidContact = '%s', handler = '%p', offset = '%d'",
                   this, callidContact.data(), handler, offset.cvtToMsecs());
 
-    _appearanceTimers.scheduleOneshotAfter(
-             new AppearanceMsg(handler, callidContact),
-             offset);
+    OsStatus ret = _appearanceTimers.scheduleOneshotAfter(
+                         new AppearanceMsg(handler, callidContact),
+                         offset);
+    if (OS_SUCCESS != ret)
+    {
+        Os::Logger::instance().log(FAC_SAA, PRI_ERR,
+                "AppearanceGroupSet::addAppearanceByTimer failed "
+                "this = %p, callidContact = '%s', handler = '%p', offset = '%d'",
+                      this, callidContact.data(), handler, offset.cvtToMsecs());
+    }
+
+    return (OS_SUCCESS == ret);
 }
 
 // Create and add an Appearance Group.
