@@ -633,27 +633,29 @@ void ContactSet::updateSubscriptions(bool allowDirectUriSubscription)
             // generates requests to the ResourceListServer task, so a longer
             // wait would prevent the ResourceListServer task from servicing
             // requests as fast as it received them.
-            if (wait_after_subscription_ended)
-            {
-                Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                        "ContactSet::updateSubscriptions waiting for %d msec",
-                        subscription_wait_msec);
+        	if (!mSubscriptionSets.find(callid_contact))
+        	{
+				if (wait_after_subscription_ended)
+				{
+					Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+							"ContactSet::updateSubscriptions waiting for %d msec",
+							subscription_wait_msec);
 
-                OsTime offset(subscription_wait_msec);
-                bool ret = getResourceListSet()->addSubscriptionSetByTimer(*callid_contact, this, offset);
-                if (ret)
-                {
-                    subscriptionSetCount++;
-                    /* for each successful fire timer the wait is incremented */
-                    subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
-                }
-            }
-            else
-            {
-                subscriptionSetCount++;
-                addSubscriptionSet(callid_contact);
-            }
-
+					OsTime offset(subscription_wait_msec);
+					bool ret = getResourceListSet()->addSubscriptionSetByTimer(*callid_contact, this, offset);
+					if (ret)
+					{
+						subscriptionSetCount++;
+						/* for each successful fire timer the wait is incremented */
+						subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
+					}
+				}
+				else
+				{
+					subscriptionSetCount++;
+					addSubscriptionSet(callid_contact);
+				}
+        	}
         }
 
         Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
@@ -768,25 +770,16 @@ void ContactSet::addSubscriptionSet(const UtlString* callidContact)
                    callidContact->index(';') +
                    1);
 
-     // Check to see if there is already a subscription with this name.
-     if (!mSubscriptionSets.find(callidContact))
-     {
-        // Create the subscription set
-        SubscriptionSet* ss = new SubscriptionSet(mResource,  uri);
+    // Create the subscription set
+	SubscriptionSet* ss = new SubscriptionSet(mResource,  uri);
 
-        // Add the subscription to the set.
-        mSubscriptionSets.insertKeyAndValue(new UtlString(*callidContact), ss);
+	// Add the subscription to the set.
+	mSubscriptionSets.insertKeyAndValue(new UtlString(*callidContact), ss);
 
-        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                "ContactSet::addSubscriptionSet "
-                "added SubscriptionSet for uri = '%s'",
-                uri.data() );
-     }
-     else
-     {
-        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                      "ContactSet::addSubscriptionSet SubscriptionSet for uri '%s' already exists", uri.data());
-     }
+	Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+			"ContactSet::addSubscriptionSet "
+			"added SubscriptionSet for uri = '%s'",
+			uri.data() );
 }
 
 /* //////////////////////////// PROTECTED ///////////////////////////////// */

@@ -917,24 +917,27 @@ void AppearanceGroup::updateSubscriptions()
         {
             // If we both terminate subscriptions and create subscriptions,
             // wait a short while to allow the terminations to complete.
-            if (wait_after_subscription_ended)
+            if (!mAppearances.find(callid_contact))
             {
-                Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                            "AppearanceGroup::updateSubscriptions waiting for %d msec",
-                            subscription_wait_msec);
+            	if (wait_after_subscription_ended)
+            	{
+					Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+								"AppearanceGroup::updateSubscriptions waiting for %d msec",
+								subscription_wait_msec);
 
-                OsTime offset(subscription_wait_msec);
-                bool ret = mAppearanceGroupSet->addAppearanceByTimer(*callid_contact, this, offset);
-                if (ret)
-                {
-                    appearancesCount++;
-                    subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
-                }
-            }
-            else
-            {
-                appearancesCount++;
-                addAppearance(callid_contact);
+					OsTime offset(subscription_wait_msec);
+					bool ret = mAppearanceGroupSet->addAppearanceByTimer(*callid_contact, this, offset);
+					if (ret)
+					{
+						appearancesCount++;
+						subscription_wait_msec += SUBSCRIPTION_WAIT_INCR_MSEC;
+					}
+            	}
+				else
+				{
+					appearancesCount++;
+					addAppearance(callid_contact);
+				}
             }
         }
 
@@ -1016,27 +1019,18 @@ void AppearanceGroup::addAppearance(const UtlString* callidContact)
                    callidContact->index(';') +
                    1);
 
-     // Check to see if there is already a group with this name.
-     if (!mAppearances.find(callidContact))
-     {
-        // Create the appearance
-        Appearance* appearance = new Appearance(getAppearanceAgent(), this,  uri);
+	// Create the appearance
+	Appearance* appearance = new Appearance(getAppearanceAgent(), this,  uri);
 
-        // Add the appearance group to the set.
-        mAppearances.insertKeyAndValue(new UtlString(*callidContact),
-                                       appearance
-                                       );
+	// Add the appearance group to the set.
+	mAppearances.insertKeyAndValue(new UtlString(*callidContact),
+								   appearance
+								   );
 
-        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                "AppearanceGroup::addAppearance "
-                "added Appearance for uri = '%s'",
-                uri.data() );
-     }
-     else
-     {
-        Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
-                      "AppearanceGroup::addAppearance Appearance for uri '%s' already exists", uri.data());
-     }
+	Os::Logger::instance().log(FAC_SAA, PRI_DEBUG,
+			"AppearanceGroup::addAppearance "
+			"added Appearance for uri = '%s'",
+			uri.data() );
 }
 
 
