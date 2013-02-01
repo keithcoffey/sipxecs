@@ -5130,13 +5130,7 @@ void SipTransaction::touch()
     // savings.
     OsTime time;
     OsDateTime::getCurTimeSinceBoot(time);
-
-    //
-    // if the transaction is already in completed state, do not reset the timestamp
-    //
-    if (getState() < TRANSACTION_COMPLETE)
-        mTimeStamp = time.seconds();
-
+    mTimeStamp = time.seconds();
     //osPrintf("SipTransaction::touch seconds: %ld usecs: %ld\n",
     //    time.seconds(), time.usecs());
     //mTimeStamp = OsDateTime::getSecsSinceEpoch();
@@ -5153,16 +5147,12 @@ void SipTransaction::touch()
 
 void SipTransaction::touchBelow(int newDate)
 {
-    //
-    // if the transaction is already in completed state, do not reset the timestamp
-    //
-    if (getState() < TRANSACTION_COMPLETE)
-      mTimeStamp = newDate;
+    mTimeStamp = newDate;
 
 #ifdef TEST_TOUCH
     UtlString serialized;
     toString(serialized, FALSE);
-    Os::Logger::instance().log(FAC_SIP, PRI_DEBUG,
+    OsSysLog::add(FAC_SIP, PRI_DEBUG,
                   "SipTransaction::touchBelow "
                   "'%s'",
                   serialized.data());
